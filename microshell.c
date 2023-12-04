@@ -6,9 +6,6 @@
 #include <sys/types.h>
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // fork, write, exit, chdir, execve, dup, dup2, pipe
-// testing
-#include <stdio.h>
-// testing
 
 //---------------------------------------------------------------------------
 //** error handling       ---------------------------------------------------
@@ -71,7 +68,7 @@ typedef struct _sc
 int exit_status = 0;
 
 // built-ins
-int cd(const char *path);
+int cd(simple_cmd *cmd);
 // utils
 size_t ft_strlen(const char *s);
 // close pipe
@@ -93,6 +90,8 @@ int main(int argc, char **argv, char **envp)
     {
         get_cmd(argv);
         simple_cmd *cur = malloc(sizeof(simple_cmd));
+        if (!cur)
+            error(SYS_ERR);
         cur->start = cmd[START];
         cur->end = cmd[END];
         cur->len = cmd[END] - cmd[START] + 1;
@@ -110,8 +109,10 @@ int main(int argc, char **argv, char **envp)
     {
         // create argv to pass to exec
         temp->args = malloc(sizeof(char *) * temp->len + 1);
-        int i = 0;
-        for (int i = temp->start; i < temp->end; i++)
+        if (!temp->args)
+            error(SYS_ERR);
+        int i;
+        for (i = temp->start; i < temp->end; i++)
             temp->args[i - temp->start] = argv[i];
         temp->args[i - temp->start] = NULL;
 
@@ -131,7 +132,9 @@ int main(int argc, char **argv, char **envp)
                     if (dup2(pipe_fd[OUT], STDOUT_FILENO) < 0)
                         error(SYS_ERR);
                     close_pipe(pipe_fd);
-                    if (execve(temp->args[0], temp->args, envp))
+                    if (!strcmp(temp->args[0], "cd"))
+                        cd(temp);
+                    else if (execve(temp->args[0], temp->args, envp))
                         error_exit(temp->args[0]);
                 }
                 else
@@ -152,7 +155,9 @@ int main(int argc, char **argv, char **envp)
                     error(SYS_ERR);
                 if (temp->args[0] && !fork())
                 {
-                    if (execve(temp->args[0], temp->args, envp))
+                    if (!strcmp(temp->args[0], "cd"))
+                        cd(temp);
+                    else if (execve(temp->args[0], temp->args, envp))
                         error_exit(temp->args[0]);
                 }
                 else
@@ -163,7 +168,9 @@ int main(int argc, char **argv, char **envp)
             {
                 if (temp->args[0] && !fork())
                 {
-                    if (execve(temp->args[0], temp->args, envp))
+                    if (!strcmp(temp->args[0], "cd"))
+                        cd(temp);
+                    else if (execve(temp->args[0], temp->args, envp))
                         error_exit(temp->args[0]);
                 }
                 else
@@ -184,8 +191,11 @@ size_t ft_strlen(const char *s)
     return len;
 }
 
-int cd(const char *path)
+int cd(simple_cmd *cmd)
 {
+    if (cmd->len != 2)
+        error(CD_ARGS);
+    char *path = cmd->args[1];
     if (chdir(path) < 0)
     {
         write(STDERR_FILENO, "error: cd: cannot change directory to ", 38);
@@ -196,7 +206,6 @@ int cd(const char *path)
     return (SUCC);
 }
 
-// {1, 1, 1}
 void get_cmd(char **argv)
 {
 
