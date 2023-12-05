@@ -7,11 +7,17 @@
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // fork, write, exit, chdir, execve, dup, dup2, pipe
 
+/* TODO -------------------------------------------------------------------*/
+// [ ] implement cd
+// [ ] simplifiy get_cmd
+/* ------------------------------------------------------------------------*/
+
 //---------------------------------------------------------------------------
 //** error handling       ---------------------------------------------------
 //---------------------------------------------------------------------------
 
-#define FAIL 1
+#include <stdio.h>
+#define FAIL -1
 #define SUCC 0
 
 #define CD_ARGS "error: cd: bad arguments"
@@ -22,8 +28,9 @@
     {                                                                          \
         write(STDERR_FILENO, error_msg, ft_strlen(error_msg));                 \
         write(STDERR_FILENO, "\n", 1);                                         \
-        return -1;                                                             \
+        return (FAIL);                                                         \
     } while (false)
+
 #define error_exit(path)                                                       \
     do                                                                         \
     {                                                                          \
@@ -31,7 +38,6 @@
         write(STDERR_FILENO, path, ft_strlen(path));                           \
         write(STDERR_FILENO, "\n", 1);                                         \
         exit(WEXITSTATUS(exit_status));                                        \
-        return -1;                                                             \
     } while (false)
 
 //---------------------------------------------------------------------------
@@ -105,37 +111,37 @@ int main(int argc, char **argv, char **envp)
     }
 
     // execute
-    for (simple_cmd *temp = head; temp; temp = temp->next)
+    for (simple_cmd *cur = head; cur; cur = cur->next)
     {
         // create argv to pass to exec
-        temp->args = malloc(sizeof(char *) * temp->len + 1);
-        if (!temp->args)
+        cur->args = malloc(sizeof(char *) * cur->len + 1);
+        if (!cur->args)
             error(SYS_ERR);
         int i;
-        for (i = temp->start; i < temp->end; i++)
-            temp->args[i - temp->start] = argv[i];
-        temp->args[i - temp->start] = NULL;
+        for (i = cur->start; i < cur->end; i++)
+            cur->args[i - cur->start] = argv[i];
+        cur->args[i - cur->start] = NULL;
 
         // execve
         int pipe_fd[2];
         int old_fd[2] = { dup(STDIN_FILENO),
                           dup(STDOUT_FILENO) }; // error check
 #if 1
-        switch (temp->type)
+        switch (cur->type)
         {
             case PIPE:
             {
                 if (pipe(pipe_fd) < 0)
                     error(SYS_ERR);
-                if (temp->args[0] && !fork())
+                if (cur->args[0] && !fork())
                 {
                     if (dup2(pipe_fd[OUT], STDOUT_FILENO) < 0)
                         error(SYS_ERR);
                     close_pipe(pipe_fd);
-                    if (!strcmp(temp->args[0], "cd"))
-                        cd(temp);
-                    else if (execve(temp->args[0], temp->args, envp))
-                        error_exit(temp->args[0]);
+                    if (!strcmp(cur->args[0], "cd"))
+                        cd(cur);
+                    else if (execve(cur->args[0], cur->args, envp))
+                        error_exit(cur->args[0]);
                 }
                 else
                 {
@@ -153,12 +159,12 @@ int main(int argc, char **argv, char **envp)
                     error(SYS_ERR);
                 if (dup2(STDIN_FILENO, old_fd[IN]) < 0)
                     error(SYS_ERR);
-                if (temp->args[0] && !fork())
+                if (cur->args[0] && !fork())
                 {
-                    if (!strcmp(temp->args[0], "cd"))
-                        cd(temp);
-                    else if (execve(temp->args[0], temp->args, envp))
-                        error_exit(temp->args[0]);
+                    if (!strcmp(cur->args[0], "cd"))
+                        cd(cur);
+                    else if (execve(cur->args[0], cur->args, envp))
+                        error_exit(cur->args[0]);
                 }
                 else
                     wait(&exit_status);
@@ -166,12 +172,12 @@ int main(int argc, char **argv, char **envp)
             }
             default:
             {
-                if (temp->args[0] && !fork())
+                if (cur->args[0] && !fork())
                 {
-                    if (!strcmp(temp->args[0], "cd"))
-                        cd(temp);
-                    else if (execve(temp->args[0], temp->args, envp))
-                        error_exit(temp->args[0]);
+                    if (!strcmp(cur->args[0], "cd"))
+                        cd(cur);
+                    else if (execve(cur->args[0], cur->args, envp))
+                        error_exit(cur->args[0]);
                 }
                 else
                     wait(&exit_status);
@@ -193,7 +199,7 @@ size_t ft_strlen(const char *s)
 
 int cd(simple_cmd *cmd)
 {
-    if (cmd->len != 2)
+    if (cmd->len - 1 != 2)
         error(CD_ARGS);
     char *path = cmd->args[1];
     if (chdir(path) < 0)
