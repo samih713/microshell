@@ -88,6 +88,17 @@ size_t ft_strlen(const char *s);
 int main(int argc, char **argv, char **envp)
 {
     (void)argc;
+
+#if 0
+while(argv[cmd[END]])
+	{
+		printf("-----------------------------------------\n");
+		get_cmd(argv);
+		for(int i = cmd[START]; i < cmd[END]; i++)
+			printf("cmd[%d]:%s\n", i, argv[cmd[i]]);
+	}
+#endif // printer
+#if 1
     // parse
     simple_cmd *prev = NULL;
     simple_cmd *head = NULL;
@@ -126,7 +137,6 @@ int main(int argc, char **argv, char **envp)
         int pipe_fd[2];
         int old_fd[2] = { dup(STDIN_FILENO),
                           dup(STDOUT_FILENO) }; // error check
-#if 1
         switch (cur->type)
         {
             case PIPE:
@@ -183,8 +193,8 @@ int main(int argc, char **argv, char **envp)
                     wait(&exit_status);
             }
         }
-#endif
     }
+#endif
     return SUCC;
 }
 
