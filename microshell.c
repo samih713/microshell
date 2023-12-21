@@ -16,29 +16,30 @@
 //** error handling       ---------------------------------------------------
 //---------------------------------------------------------------------------
 
-#include <stdio.h>
 #define FAIL -1
 #define SUCC 0
 
 #define CD_ARGS "error: cd: bad arguments"
 #define SYS_ERR "error: fatal"
 
-#define error(error_msg)                                                       \
-    do                                                                         \
-    {                                                                          \
-        write(STDERR_FILENO, error_msg, ft_strlen(error_msg));                 \
-        write(STDERR_FILENO, "\n", 1);                                         \
-        return (FAIL);                                                         \
-    } while (false)
+#define error(error_msg)                                               \
+	do                                                             \
+	{                                                              \
+		write(STDERR_FILENO, error_msg, ft_strlen(error_msg)); \
+		write(STDERR_FILENO, "\n", 1);                         \
+		return (FAIL);                                         \
+	}                                                              \
+	while(false)
 
-#define error_exit(path)                                                       \
-    do                                                                         \
-    {                                                                          \
-        write(STDERR_FILENO, "error: cannot execute ", 22);                    \
-        write(STDERR_FILENO, path, ft_strlen(path));                           \
-        write(STDERR_FILENO, "\n", 1);                                         \
-        exit(WEXITSTATUS(exit_status));                                        \
-    } while (false)
+#define error_exit(path)                                            \
+	do                                                          \
+	{                                                           \
+		write(STDERR_FILENO, "error: cannot execute ", 22); \
+		write(STDERR_FILENO, path, ft_strlen(path));        \
+		write(STDERR_FILENO, "\n", 1);                      \
+		exit(WEXITSTATUS(exit_status));                     \
+	}                                                           \
+	while(false)
 
 //---------------------------------------------------------------------------
 //** command             ----------------------------------------------------
@@ -58,12 +59,12 @@ void get_cmd(char **argv);
 
 typedef struct _sc
 {
-        int         start;
-        int         end;
-        int         len;
-        int         type;
-        char      **args;
-        struct _sc *next;
+	int         start;
+	int         end;
+	int         len;
+	int         type;
+	char      **args;
+	struct _sc *next;
 } simple_cmd;
 
 // pipe fds
@@ -78,16 +79,17 @@ int cd(simple_cmd *cmd);
 // utils
 size_t ft_strlen(const char *s);
 // close pipe
-#define close_pipe(fd)                                                         \
-    do                                                                         \
-    {                                                                          \
-        close((fd)[OUT]);                                                      \
-        close((fd)[IN]);                                                       \
-    } while (false)
+#define close_pipe(fd)            \
+	do                        \
+	{                         \
+		close((fd)[OUT]); \
+		close((fd)[IN]);  \
+	}                         \
+	while(false)
 
 int main(int argc, char **argv, char **envp)
 {
-    (void)argc;
+	(void)argc;
 
 #if 0
 while(argv[cmd[END]])
@@ -99,144 +101,143 @@ while(argv[cmd[END]])
 	}
 #endif // printer
 #if 1
-    // parse
-    simple_cmd *prev = NULL;
-    simple_cmd *head = NULL;
+	// parse
+	simple_cmd *prev = NULL;
+	simple_cmd *head = NULL;
 
-    while (argv[cmd[END]])
-    {
-        get_cmd(argv);
-        simple_cmd *cur = malloc(sizeof(simple_cmd));
-        if (!cur)
-            error(SYS_ERR);
-        cur->start = cmd[START];
-        cur->end = cmd[END];
-        cur->len = cmd[END] - cmd[START] + 1;
-        cur->type = (argv[cmd[END]] ? argv[cmd[END]][0] : LAST);
-        cur->next = NULL;
-        if (prev)
-            prev->next = cur;
-        else
-            head = cur;
-        prev = cur;
-    }
+	while(argv[cmd[END]])
+	{
+		get_cmd(argv);
+		simple_cmd *cur = malloc(sizeof(simple_cmd));
+		if(!cur)
+			error(SYS_ERR);
+		cur->start = cmd[START];
+		cur->end   = cmd[END];
+		cur->len   = cmd[END] - cmd[START] + 1;
+		cur->type  = (argv[cmd[END]] ? argv[cmd[END]][0] : LAST);
+		cur->next  = NULL;
+		if(prev)
+			prev->next = cur;
+		else
+			head = cur;
+		prev = cur;
+	}
 
-    // execute
-    for (simple_cmd *cur = head; cur; cur = cur->next)
-    {
-        // create argv to pass to exec
-        cur->args = malloc(sizeof(char *) * cur->len + 1);
-        if (!cur->args)
-            error(SYS_ERR);
-        int i;
-        for (i = cur->start; i < cur->end; i++)
-            cur->args[i - cur->start] = argv[i];
-        cur->args[i - cur->start] = NULL;
-
-        // execve
-        int pipe_fd[2];
-        int old_fd[2] = { dup(STDIN_FILENO),
-                          dup(STDOUT_FILENO) }; // error check
-        switch (cur->type)
-        {
-            case PIPE:
-            {
-                if (pipe(pipe_fd) < 0)
-                    error(SYS_ERR);
-                if (cur->args[0] && !fork())
-                {
-                    if (dup2(pipe_fd[OUT], STDOUT_FILENO) < 0)
-                        error(SYS_ERR);
-                    close_pipe(pipe_fd);
-                    if (!strcmp(cur->args[0], "cd"))
-                        cd(cur);
-                    else if (execve(cur->args[0], cur->args, envp))
-                        error_exit(cur->args[0]);
-                }
-                else
-                {
-                    wait(&exit_status);
-                    if (dup2(pipe_fd[IN], STDIN_FILENO) < 0)
-                        error(SYS_ERR);
-                    close_pipe(pipe_fd);
-                }
-                break;
-            }
-            case SEQ:
-            {
-                // reset fds
-                if (dup2(STDOUT_FILENO, old_fd[OUT]) < 0)
-                    error(SYS_ERR);
-                if (dup2(STDIN_FILENO, old_fd[IN]) < 0)
-                    error(SYS_ERR);
-                if (cur->args[0] && !fork())
-                {
-                    if (!strcmp(cur->args[0], "cd"))
-                        cd(cur);
-                    else if (execve(cur->args[0], cur->args, envp))
-                        error_exit(cur->args[0]);
-                }
-                else
-                    wait(&exit_status);
-                break;
-            }
-            default:
-            {
-                if (cur->args[0] && !fork())
-                {
-                    if (!strcmp(cur->args[0], "cd"))
-                        cd(cur);
-                    else if (execve(cur->args[0], cur->args, envp))
-                        error_exit(cur->args[0]);
-                }
-                else
-                    wait(&exit_status);
-            }
-        }
-    }
+	int pipe_fd[2];
+	int old_fd[2] = { dup(STDIN_FILENO), dup(STDOUT_FILENO) }; // error check
+	// execute
+	for(simple_cmd *cur = head; cur; cur = cur->next)
+	{
+		// create argv to pass to exec
+		cur->args = malloc(sizeof(char *) * cur->len + 1);
+		if(!cur->args)
+			error(SYS_ERR);
+		int i;
+		for(i = cur->start; i < cur->end; i++)
+			cur->args[i - cur->start] = argv[i];
+		cur->args[i - cur->start] = NULL;
+		// execve
+		switch(cur->type)
+		{
+			case PIPE:
+				{
+					if(pipe(pipe_fd) < 0)
+						error(SYS_ERR);
+					if(cur->args[0] && !fork())
+					{
+						if(dup2(pipe_fd[OUT], STDOUT_FILENO) < 0)
+							error(SYS_ERR);
+						close_pipe(pipe_fd);
+						if(!strcmp(cur->args[0], "cd"))
+							cd(cur);
+						else if(execve(cur->args[0], cur->args, envp))
+							error_exit(cur->args[0]);
+					}
+					else
+					{
+						wait(&exit_status);
+						if(dup2(pipe_fd[IN], STDIN_FILENO) < 0)
+							error(SYS_ERR);
+						close_pipe(pipe_fd);
+					}
+					break;
+				}
+			case SEQ:
+				{
+					// reset fds
+					if(dup2(STDOUT_FILENO, old_fd[OUT]) < 0)
+						error(SYS_ERR);
+					if(dup2(STDIN_FILENO, old_fd[IN]) < 0)
+						error(SYS_ERR);
+					if(cur->args[0] && !strcmp(cur->args[0], "cd"))
+						cd(cur);
+					else if(cur->args[0] && !fork())
+					{
+						if(execve(cur->args[0], cur->args, envp))
+							error_exit(cur->args[0]);
+					}
+					else
+						wait(&exit_status);
+					break;
+				}
+			default:
+				{
+					if(cur->args[0] && !fork())
+					{
+						if(!strcmp(cur->args[0], "cd"))
+							cd(cur);
+						else if(execve(cur->args[0], cur->args, envp))
+							error_exit(cur->args[0]);
+					}
+					else
+						wait(&exit_status);
+				}
+		}
+	}
 #endif
-    return SUCC;
+	return SUCC;
 }
 
 // helper functions
 size_t ft_strlen(const char *s)
 {
-    size_t len = 0;
-    while (s && s[len])
-        len++;
-    return len;
+	size_t len = 0;
+	while(s && s[len])
+		len++;
+	return len;
 }
 
 int cd(simple_cmd *cmd)
 {
-    if (cmd->len - 1 != 2)
-        error(CD_ARGS);
-    char *path = cmd->args[1];
-    if (chdir(path) < 0)
-    {
-        write(STDERR_FILENO, "error: cd: cannot change directory to ", 38);
-        write(STDERR_FILENO, path, ft_strlen(path));
-        write(STDERR_FILENO, "\n", 1);
-        return (FAIL);
-    }
-    return (SUCC);
+	if(cmd->len - 1 != 2)
+		error(CD_ARGS);
+	char *path = cmd->args[1];
+	if(chdir(path) < 0)
+	{
+		write(STDERR_FILENO, "error: cd: cannot change directory to ", 38);
+		write(STDERR_FILENO, path, ft_strlen(path));
+		write(STDERR_FILENO, "\n", 1);
+		return (FAIL);
+	}
+	return (SUCC);
 }
 
 void get_cmd(char **argv)
 {
 
-    if ((argv[cmd[END]] != 0 && cmd[END] != cmd[START]) || !cmd[LEN])
-        cmd[START] = cmd[END] + 1;
+	if((argv[cmd[END]] != 0 && cmd[END] != cmd[START]) || !cmd[LEN])
+		cmd[START] = cmd[END] + 1;
 
-    size_t tok_len = ft_strlen(argv[cmd[END]]);
+	size_t tok_len = ft_strlen(argv[cmd[END]]);
 
-    for (cmd[END] = cmd[START];
-         argv[cmd[END]] && strncmp(argv[cmd[END]], "|", tok_len) &&
-         strncmp(argv[cmd[END]], ";", tok_len);
-         cmd[END]++)
+	for(cmd[END] = cmd[START];
+	argv[cmd[END]]
+	&& strncmp(argv[cmd[END]], "|", tok_len)
+	&& strncmp(argv[cmd[END]], ";", tok_len);
+	    cmd[END]++)
 
-        tok_len = ft_strlen(argv[cmd[END]]);
+		tok_len = ft_strlen(argv[cmd[END]]);
 
-    ;
-    cmd[LEN] = cmd[END] - cmd[START];
+	;
+	cmd[LEN] = cmd[END] - cmd[START];
 }
