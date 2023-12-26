@@ -67,7 +67,7 @@ void cd(const char *path, int arg_count)
 		write(STDERR_FILENO, PATH_ERROR, ft_strlen(PATH_ERROR));
 		write(STDERR_FILENO, path, ft_strlen(path));
 		write(STDERR_FILENO, "\n", 1);
-		exit (1);
+		exit(1);
 	}
 	exit(0);
 }
@@ -76,8 +76,6 @@ void cd(const char *path, int arg_count)
 
 int main(int argc, char **argv)
 {
-	// if(argc < 2)
-	// 	return -1;
 	// variables
 	int  length = 0;
 	int  start  = 1;
@@ -86,7 +84,6 @@ int main(int argc, char **argv)
 
 	// pipe fds
 	int pipe_fd[2];
-	int old_fd[2] = { dup(STDIN_FILENO), dup(STDOUT_FILENO) };
 
 	// main loop
 	while(argv[end])
@@ -98,12 +95,7 @@ int main(int argc, char **argv)
 		length = end - start;
 		type   = (argv[end] ? argv[end][0] : 0);
 
-    (void)argc;
-  
-		// // if no command return
-		// if(length <= 0)
-		// 	return 0;
-		// else make a command
+		(void)argc;
 		char **command = malloc(sizeof(char *) * length + 1);
 		if(!command)
 			error(SYS_ERROR);
@@ -129,12 +121,7 @@ int main(int argc, char **argv)
 						if(!strcmp(command[0], "cd"))
 							cd(command[0], length);
 						else if(execve(command[0], command, NULL))
-						{
-							if(dup2(STDOUT_FILENO, old_fd[OUT])
-							   < 0)
-								error(SYS_ERROR);
 							error_exit(command[0], EXEC_ERROR);
-						}
 					}
 					else
 					{
@@ -156,9 +143,7 @@ int main(int argc, char **argv)
 							error_exit(command[0], EXEC_ERROR);
 					}
 					else
-					{
 						waitpid(0, NULL, 0);
-					}
 					break;
 				}
 			default:
@@ -171,9 +156,7 @@ int main(int argc, char **argv)
 							error_exit(command[0], EXEC_ERROR);
 					}
 					else
-					{
 						waitpid(0, NULL, 0);
-					}
 				}
 		}
 		// free command
